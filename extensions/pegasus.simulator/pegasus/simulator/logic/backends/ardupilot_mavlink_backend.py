@@ -526,7 +526,8 @@ class ArduPilotMavlinkBackend(Backend):
 
         # When this object gets destroyed, close the mavlink connection to free the communication port
         try:
-            self.stop()
+            self._connection.close()
+            self._connection = None
         except:
             carb.log_info("Mavlink connection was not closed, because it was never opened")
 

@@ -131,8 +131,7 @@ autodoc_mock_imports = [
     "std_msgs",
     "sensor_msgs",
     "geometry_msgs",
-    "isaacsim",
-    "NavSchema"
+    "isaacsim"
 ]
 
 # -- Options for HTML output -------------------------------------------------

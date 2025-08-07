@@ -29,11 +29,21 @@ except ImportError:
 
 from pegasus.simulator.logic.backends.backend import Backend
 
-# Import the replicatore core module used for writing graphical data to ROS 2
+# Import the replicator core module used for writing graphical data to ROS 2
 import omni
 import omni.graph.core as og
 import omni.replicator.core as rep
-from isaacsim.ros2.bridge import read_camera_info
+
+# Fixed import for Isaac Sim 5.0
+try:
+    from isaacsim.ros2.bridge.impl.camera_info_utils import read_camera_info
+except ImportError:
+    try:
+        # Fallback for older versions
+        from isaacsim.ros2.bridge import read_camera_info
+    except ImportError:
+        carb.log_error("Could not import read_camera_info - ROS2 bridge may not be properly installed")
+        read_camera_info = None
 
 
 class ROS2Backend(Backend):
@@ -103,7 +113,7 @@ class ROS2Backend(Backend):
         # NOTE: this is done this way, because the writers move data from the GPU->CPU and then publish it to ROS2
         # in a separate thread. This is done to avoid blocking the simulation
         self.graphical_sensors_writers = {}
-        
+
         # Setup zero input reference for the thrusters
         self.input_ref = [0.0 for i in range(self._num_rotors)]
 
@@ -120,6 +130,10 @@ class ROS2Backend(Backend):
 
             # Initialize the dynamic tf broadcaster for the position of the body of the vehicle (base_link) with respect to the inertial frame (map - ENU) expressed in the inertil frame (map - ENU)
             self.tf_broadcaster = TransformBroadcaster(self.node)
+
+        print(f"✓ ROS2Backend initialized for vehicle {vehicle_id}")
+        print(f"✓ Node created: simulator_vehicle_{vehicle_id}")
+        print(f"✓ Namespace: {self._namespace}")
     
     
     def initialize_publishers(self, config: dict):
@@ -204,7 +218,7 @@ class ROS2Backend(Backend):
 
         self.tf_static_broadcaster.sendTransform(t)
 
-    def update_state(self, state):
+    def update_state_default(self, state):
         """
         Method that when implemented, should handle the receivel of the state of the vehicle using this callback
         """
@@ -278,7 +292,82 @@ class ROS2Backend(Backend):
             t.transform.rotation.z = state.attitude[2]
             t.transform.rotation.w = state.attitude[3]
             self.tf_broadcaster.sendTransform(t)
-        
+
+    def update_state(self, state):
+        """
+        Method that when implemented, should handle the receivel of the state of the vehicle using this callback
+        """
+
+        # Publish the state of the vehicle only if the flag is set to True
+        if not self._pub_state:
+            print("❌ Publishing disabled (_pub_state=False)")
+            return
+
+        pose = PoseStamped()
+        twist = TwistStamped()
+        twist_inertial = TwistStamped()
+        accel = AccelStamped()
+
+        # Update the header
+        pose.header.stamp = self.node.get_clock().now().to_msg()
+        twist.header.stamp = pose.header.stamp
+        twist_inertial.header.stamp = pose.header.stamp
+        accel.header.stamp = pose.header.stamp
+
+        pose.header.frame_id = "map"
+        twist.header.frame_id = self._namespace + "_" + "base_link"
+        twist_inertial.header.frame_id = "map"
+        accel.header.frame_id = "map"
+
+        # Fill the position and attitude of the vehicle in ENU
+        pose.pose.position.x = state.position[0]
+        pose.pose.position.y = state.position[1]
+        pose.pose.position.z = state.position[2]
+
+        pose.pose.orientation.x = state.attitude[0]
+        pose.pose.orientation.y = state.attitude[1]
+        pose.pose.orientation.z = state.attitude[2]
+        pose.pose.orientation.w = state.attitude[3]
+
+        # Fill the linear and angular velocities in the body frame of the vehicle
+        twist.twist.linear.x = state.linear_body_velocity[0]
+        twist.twist.linear.y = state.linear_body_velocity[1]
+        twist.twist.linear.z = state.linear_body_velocity[2]
+
+        twist.twist.angular.x = state.angular_velocity[0]
+        twist.twist.angular.y = state.angular_velocity[1]
+        twist.twist.angular.z = state.angular_velocity[2]
+
+        # Fill the linear velocity of the vehicle in the inertial frame
+        twist_inertial.twist.linear.x = state.linear_velocity[0]
+        twist_inertial.twist.linear.y = state.linear_velocity[1]
+        twist_inertial.twist.linear.z = state.linear_velocity[2]
+
+        # Fill the linear acceleration in the inertial frame
+        accel.accel.linear.x = state.linear_acceleration[0]
+        accel.accel.linear.y = state.linear_acceleration[1]
+        accel.accel.linear.z = state.linear_acceleration[2]
+
+        # Publish the messages containing the state of the vehicle
+        self.pose_pub.publish(pose)
+        self.twist_pub.publish(twist)
+        self.twist_inertial_pub.publish(twist_inertial)
+        self.accel_pub.publish(accel)
+
+        # Update the dynamic tf broadcaster with the current position of the vehicle in the inertial frame
+        if self._pub_tf:
+            t = TransformStamped()
+            t.header.stamp = pose.header.stamp
+            t.header.frame_id = "map"
+            t.child_frame_id = self._namespace + '_' + 'base_link'
+            t.transform.translation.x = state.position[0]
+            t.transform.translation.y = state.position[1]
+            t.transform.translation.z = state.position[2]
+            t.transform.rotation.x = state.attitude[0]
+            t.transform.rotation.y = state.attitude[1]
+            t.transform.rotation.z = state.attitude[2]
+            t.transform.rotation.w = state.attitude[3]
+            self.tf_broadcaster.sendTransform(t)
 
     def rotor_callback(self, ros_msg: Float64, rotor_id):
         # Update the reference for the rotor of the vehicle
@@ -418,20 +507,20 @@ class ROS2Backend(Backend):
 
         # Create a writer for publishing the camera info
         writer_info = rep.writers.get("ROS2PublishCameraInfo")
-        camera_info = read_camera_info(render_product_path=render_prod_path)
+        camera_info = read_camera_info(render_product_path=render_prod_path)[0] # Added [0]
         writer_info.initialize(
             nodeNamespace=self._namespace + str(self._id), 
             topicName=data["camera_name"] + "/color/camera_info", 
             frameId=data["camera_name"], 
             queueSize=1,
-            width=camera_info["width"],
-            height=camera_info["height"],
-            projectionType=camera_info["projectionType"],
-            k=camera_info["k"].reshape([1, 9]),
-            r=camera_info["r"].reshape([1, 9]),
-            p=camera_info["p"].reshape([1, 12]),
-            physicalDistortionModel=camera_info["physicalDistortionModel"],
-            physicalDistortionCoefficients=camera_info["physicalDistortionCoefficients"]
+            width=camera_info.width,
+            height=camera_info.height,
+            # projectionType=camera_info.projectionType, # No such attribute in the Camera class of ISaac Sim 5.0
+            k=camera_info.k.reshape([1, 9]),
+            r=camera_info.r.reshape([1, 9]),
+            p=camera_info.p.reshape([1, 12]),
+            # physicalDistortionModel=camera_info.physicalDistortionModel, # No such attributes in the Camera class of ISaac Sim 5.0
+            # physicalDistortionCoefficients=camera_info.physicalDistortionCoefficients
         )
 
         writer_info.attach([render_prod_path])

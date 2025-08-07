@@ -47,8 +47,8 @@ class MonocularCamera(GraphicalSensor):
         """
 
         # Initialize the Super class "object" attributes
-        super().__init__(sensor_type="MonocularCamera", update_rate=config.get("frequency", 60.0))        
-        
+        super().__init__(sensor_type="MonocularCamera", update_rate=config.get("frequency", 60.0))
+
         # Setup the name of the camera primitive path
         self._camera_name = camera_name
         self._stage_prim_path = ""
@@ -58,7 +58,7 @@ class MonocularCamera(GraphicalSensor):
         self._position = config.get("position", np.array([0.30, 0.0, 0.0]))
         self._orientation = config.get("orientation", np.array([0.0, 0.0, 180.0]))
         self._resolution = config.get("resolution", (1920, 1200))
-        self._frequency = config.get("frequency", 30)
+        self._frequency = config.get("frequency", 60)
         self._intrinsics = config.get("intrinsics", np.array([[958.8, 0.0, 957.8], [0.0, 956.7, 589.5], [0.0, 0.0, 1.0]]))
         self._distortion_coefficients = config.get("distortion_coefficients", np.array([0.14, -0.03, -0.0002, -0.00003, 0.009, 0.5, -0.07, 0.017]))
         self._diagonal_fov = config.get("diagonal_fov", 140.0)
@@ -71,7 +71,7 @@ class MonocularCamera(GraphicalSensor):
 
 
     def initialize(self, vehicle):
-        
+
         # Initialize the Super class "object" attributes
         super().initialize(vehicle)
 
@@ -86,10 +86,10 @@ class MonocularCamera(GraphicalSensor):
             prim_path=self._stage_prim_path,
             frequency=self._frequency,
             resolution=self._resolution)
-        
+
         # Set the camera position locally with respect to the drone
         self._camera.set_local_pose(np.array(self._position), Rotation.from_euler("ZYX", self._orientation, degrees=True).as_quat())
-        
+
     def start(self):
 
         # Set the camera intrinsics
@@ -160,7 +160,7 @@ class MonocularCamera(GraphicalSensor):
 
             if self._camera.get_projection_type() == "pinhole":
                 self._state["intrinsics"] = self._camera.get_intrinsics_matrix()
-            
+
         # If something goes wrong during the data acquisition, just return None
         except:
             self._state = None

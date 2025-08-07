@@ -38,7 +38,5 @@ class IrisConfig(MultirotorConfig):
         self.backends = [PX4MavlinkBackend(config=PX4MavlinkBackendConfig())]
 
 class Iris(Multirotor):
-
-    def __init__(self, id: int, world, init_pos=[0.0, 0.0, 0.07], init_orientation=[0.0, 0.0, 0.0, 1.0], config=IrisConfig()):
-        super().__init__(config.stage_prefix, config.usd_file, id, world, init_pos, init_orientation, config=config)
-
+    def __init__(self, id: int, init_pos=[0.0, 0.0, 0.07], init_orientation=[0.0, 0.0, 0.0, 1.0], config=IrisConfig()):
+        super().__init__(config.stage_prefix, config.usd_file, id, init_pos, init_orientation, config=config)

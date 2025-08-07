@@ -26,17 +26,17 @@ The tutorial corresponds to the ``9_people.py`` example in the ``examples`` dire
 
 .. literalinclude:: ../../../examples/9_people.py
    :language: python
-   :emphasize-lines: 22-30,35-36,43-44, 51-72, 106-109, 111-117
+   :emphasize-lines: 23-48,50-54,61-62, 69-90, 124-127, 129-135
    :linenos:
 
 2. Explanation
 --------------
 
-To start a pre-programmed simulation with moving people, you need to ensure that the ``People`` extension provided by NVIDIA is enabled. Note, in Isaac 4.5.0 we also need to create a new stage for the people extension to start properly.
+To start a pre-programmed simulation with moving people, you need to ensure that the ``People`` extension provided by NVIDIA is enabled. Note, in Isaac 4.1.0 we also need to create a new stage for the people extension to start properly.
 
 .. literalinclude:: ../../../examples/9_people.py
    :language: python
-   :lines: 22-30, 35-36
+   :lines: 23-48, 50-54
    :linenos:
    :lineno-start: 23
 
@@ -44,7 +44,7 @@ We also need to import the ``Person`` and the ``PersonController`` classes. This
 
 .. literalinclude:: ../../../examples/9_people.py
    :language: python
-   :lines: 43-44
+   :lines: 61-62
    :linenos:
    :lineno-start: 61
 
@@ -58,7 +58,7 @@ In this example, our controller makes a person walk in circles, but you can defi
 
 .. literalinclude:: ../../../examples/9_people.py
    :language: python
-   :lines: 51-72
+   :lines: 69-90
    :linenos:
    :lineno-start: 69
 
@@ -70,7 +70,7 @@ The next step is to create a person in the simulation. But, you let's imagine yo
 
 .. literalinclude:: ../../../examples/9_people.py
    :language: python
-   :lines: 106-109
+   :lines: 124-127
    :linenos:
    :lineno-start: 124
 
@@ -79,7 +79,7 @@ Note that if you just want to send a person to a given position manually (withou
 
 .. literalinclude:: ../../../examples/9_people.py
    :language: python
-   :lines: 111-117
+   :lines: 129-135
    :linenos:
    :lineno-start: 129
 

@@ -19,7 +19,8 @@ from pegasus.simulator.params import ROBOTS, SIMULATION_ENVIRONMENTS, BACKENDS, 
 from pegasus.simulator.logic.interface.pegasus_interface import PegasusInterface
 
 # Vehicle Manager to spawn Vehicles
-from pegasus.simulator.logic.backends import Backend, BackendConfig, PX4MavlinkBackend, PX4MavlinkBackendConfig, ArduPilotMavlinkBackend, ArduPilotMavlinkBackendConfig
+from pegasus.simulator.logic.backends import Backend, BackendConfig, ArduPilotMavlinkBackend, ArduPilotMavlinkBackendConfig
+# from pegasus.simulator.logic.backends import Backend, BackendConfig, PX4MavlinkBackend, PX4MavlinkBackendConfig, ArduPilotMavlinkBackend, ArduPilotMavlinkBackendConfig
 from pegasus.simulator.logic.vehicles.multirotor import Multirotor, MultirotorConfig
 from pegasus.simulator.logic.vehicle_manager import VehicleManager
 from pegasus.simulator.logic.graphical_sensors.monocular_camera import MonocularCamera

@@ -104,7 +104,6 @@ class EnhancedMonocularCamera(MonocularCamera):
             if self.debug_mode:
                 print(f"[DEBUG] H.264 Streamer: {self.udp_streamer.host}:{self.udp_streamer.port}")
 
-
     def start(self):
         """Start camera"""
         super().start()
@@ -121,7 +120,6 @@ class EnhancedMonocularCamera(MonocularCamera):
         self.camera_ready = False
         self.initialization_frames = 0
         self.last_successful_frame_time = time.time()
-
 
     def stop(self):
         """Stop camera with cleanup"""
@@ -154,8 +152,7 @@ class EnhancedMonocularCamera(MonocularCamera):
         isaac_camera = self._camera
 
         current_frame = isaac_camera.get_current_frame()
-        key = 'rgb' # It actually returns RGBA so we have to get rid of alpha channel
-        data = current_frame[key]
+        data = current_frame['rgb'] # It actually returns RGBA so we have to get rid of the alpha channel
 
         if self.debug_mode:
             print(f"[DEBUG] Processing: {data.shape}, range: [{data.min()}, {data.max()}]")

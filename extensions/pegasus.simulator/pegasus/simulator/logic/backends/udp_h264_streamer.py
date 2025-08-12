@@ -103,6 +103,9 @@ class H264RTPStreamer:
             # No audio
             '-an',
 
+            # Error logging
+            '-loglevel', 'error', '-report',
+
             # Output format: raw H.264 with NAL units
             '-f', 'h264',
             '-'  # Output to stdout
@@ -193,9 +196,9 @@ class H264RTPStreamer:
 
     def fragment_nal_unit(self, nal_unit: bytes) -> List[bytes]:
         """Fragment large NAL units using FU-A fragmentation"""
-        if len(nal_unit) <= self.max_payload_size:
-            # Single NAL unit packet
-            return [nal_unit]
+        # if len(nal_unit) <= self.max_payload_size:
+        #     # Single NAL unit packet
+        #     return [nal_unit]
 
         # FU-A fragmentation needed
         packets = []
@@ -272,8 +275,36 @@ class H264RTPStreamer:
             if not is_last_fragment:
                 time.sleep(0.0001)
 
+    def is_ffmpeg_healthy(self):
+        """Check if FFmpeg is still running and responsive"""
+        if not self.ffmpeg_process or self.ffmpeg_process.poll() is not None:
+            return False
+
+        # Check if stderr has error messages
+        try:
+            # Non-blocking read of stderr
+            fd = self.ffmpeg_process.stderr.fileno()
+            fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+            fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+            stderr_data = self.ffmpeg_process.stderr.read(1024)
+            if stderr_data and b'error' in stderr_data.lower():
+                print(f"FFmpeg error detected: {stderr_data.decode()}")
+                return False
+        except:
+            pass
+
+        return True
+
     def encode_and_send_frame(self, frame: np.ndarray):
         """Encode a single camera frame to H.264 and send via RTP over UDP"""
+        # Check health before processing
+        if not self.is_ffmpeg_healthy():
+            print("FFmpeg unhealthy before processing, restarting...")
+            self.stop_ffmpeg_encoder()
+            if not self.start_ffmpeg_encoder():
+                return
+
         # Health check
         if not self.ffmpeg_process or self.ffmpeg_process.poll() is not None:
             print("FFmpeg process died, restarting...")
@@ -299,7 +330,10 @@ class H264RTPStreamer:
         max_attempts = 50 # To avoid infinite loops
         attempt = 0
         no_data_count = 0
-        max_no_data_count = 3
+        max_no_data_count = 15
+
+        # Give FFmpeg initial time to start encoding
+        time.sleep(0.005)
 
         while attempt < max_attempts and no_data_count < max_no_data_count:
             try:
@@ -309,15 +343,18 @@ class H264RTPStreamer:
                     no_data_count = 0  # Reset counter on successful read
                 else:
                     no_data_count += 1
-                    time.sleep(0.001)  # Wait for more data
+                    time.sleep(0.002)  # Wait for more data on no data
             except BlockingIOError:
                 no_data_count += 1
-                time.sleep(0.001)  # Wait before retry
+                time.sleep(0.002)  # Wait before retry on blocking
             attempt += 1
 
 
         # Get NAL units
         nal_units = self.find_nal_units(h264_data)
+
+        if self.debug_output:
+            print("Attemting to send NAL units.")
 
         if nal_units:
             # Send each NAL unit
@@ -327,11 +364,24 @@ class H264RTPStreamer:
 
             if self.debug_output:
                 print(f"Sent {len(nal_units)} NAL units ({len(h264_data)} bytes)")
+                print(f"No data count: {no_data_count}/{max_no_data_count}")
+                print(f"H.264 data of length {len(h264_data)}: {h264_data[:50]}...")
         else:
            if self.debug_output:
                 print("No valid NAL units found in H.264 data")
+                print(f"No data count: {no_data_count}/{max_no_data_count}")
+                print(f"H.264 data of length {len(h264_data)}: {h264_data}")
 
         self.timestamp += self.timestamp_increment
+
+        # Check health after processing
+        if len(h264_data) == 0 and no_data_count >= max_no_data_count:
+            print(f"\n{'='*60}")
+            print("FFMPEG STOPPED PRODUCING DATA, RESTARTING...")
+            print(f"{'='*60}т")
+            self.stop_ffmpeg_encoder()
+            time.sleep(0.1)
+            self.start_ffmpeg_encoder()
 
     def stop_ffmpeg_encoder(self):
         """Stop FFmpeg encoder process"""
@@ -365,9 +415,18 @@ class H264RTPStreamer:
             with self.queue_lock:
                 if self.frame_queue:
                     frame = self.frame_queue.pop(0)
+                    if self.debug_output:
+                        print("Frame queue is not empty.")
+                elif self.debug_output:
+                    print("Frame queue is empty.")
 
             if frame is not None:
                 self.encode_and_send_frame(frame)
+                if self.debug_output:
+                    print("Frame is not None.")
+            elif self.debug_output:
+                if self.debug_output:
+                    print("Frame is None.")
 
             # Maintain frame rate
             elapsed = time.time() - start_time

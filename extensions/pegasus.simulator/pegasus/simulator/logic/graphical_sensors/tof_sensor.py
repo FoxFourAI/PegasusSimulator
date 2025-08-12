@@ -256,24 +256,33 @@ class ToFSensor(GraphicalSensor):
 
         return None
 
-    def get_closest_measurement(self):
+    def get_closest_measurements(self):
         """
-        Get the closest distance measurement from all zones
+        Get the closest distance measurements from columns
 
         Returns:
-            float: Closest distance measurement in meters
+            list: List of 4 closest distance measurements from columns in meters
         """
         if self._state is None or "measurements" not in self._state:
             return self._max_range
 
-        return np.min(self._state["measurements"])
+        measurements = self._state["measurements"]
+        closest_measurements = np.zeros(self._resolution[1])
+
+        for i in range(self._resolution[1]): # Column idx
+            column = np.zeros(self._resolution[0]) # Save i-th column
+            for j in range(self._resolution[0]): # Row idx
+                column[j] = measurements[j][i]
+            closest_measurements[i] = np.min(column)
+
+        return closest_measurements
 
     def get_measurements_as_list(self):
         """
         Get all measurements as a flattened list
 
         Returns:
-            list: List of 16 distance measurements (row-major order)
+            list: List of 16 distance measurements (row-major)
         """
 
         return self._state["measurements"].flatten().tolist()

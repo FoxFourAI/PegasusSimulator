@@ -58,7 +58,7 @@ class MonocularCamera(GraphicalSensor):
         self._position = config.get("position", np.array([0.30, 0.0, 0.0]))
         self._orientation = config.get("orientation", np.array([0.0, 0.0, 180.0]))
         self._resolution = config.get("resolution", (1920, 1200))
-        self._frequency = config.get("frequency", 60)
+        self._frequency = config.get("frequency", 30)
         self._intrinsics = config.get("intrinsics", np.array([[958.8, 0.0, 957.8], [0.0, 956.7, 589.5], [0.0, 0.0, 1.0]]))
         self._distortion_coefficients = config.get("distortion_coefficients", np.array([0.14, -0.03, -0.0002, -0.00003, 0.009, 0.5, -0.07, 0.017]))
         self._diagonal_fov = config.get("diagonal_fov", 140.0)

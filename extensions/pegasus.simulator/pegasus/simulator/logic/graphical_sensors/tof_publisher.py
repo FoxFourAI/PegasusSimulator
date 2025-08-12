@@ -61,11 +61,10 @@ class ToFPublisher:
             10
         )
 
-        # TODO: Change format to the smallest distances out of vertical zones
         # Publisher for closest distance
         closest_publisher = self.node.create_publisher(
             Float32MultiArray,
-            f"{topic_name}/closest_distance",
+            f"{topic_name}/closest_distances",
             10
         )
 
@@ -78,8 +77,7 @@ class ToFPublisher:
         print(f"  - {topic_name}/distance_grid")
         print(f"  - {topic_name}/closest_distance")
 
-    # TODO: Change to publish the smallest distances out of vertical zones
-    def publish_tof_data(self, sensor_name, measurements, closest_distance):
+    def publish_tof_data(self, sensor_name, measurements, closest_distances):
         """Publish ToF sensor data to ROS2"""
         if not ROS2_AVAILABLE or sensor_name not in self.publishers:
             return
@@ -101,7 +99,12 @@ class ToFPublisher:
 
         # Publish the closest distance
         closest_msg = Float32MultiArray()
-        closest_msg.data = [float(closest_distance)]
+        grid_msg.layout.dim.append(MultiArrayDimension())
+        grid_msg.layout.dim[0].label = "width"
+        grid_msg.layout.dim[0].size = 4 #! TODO: Replace with constants
+        grid_msg.layout.dim[0].stride = 4
+        grid_msg.layout.data_offset = 0
+        closest_msg.data = closest_distances
 
         self.publishers[sensor_name]['closest'].publish(closest_msg)
 

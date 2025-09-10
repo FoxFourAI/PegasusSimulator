@@ -838,6 +838,9 @@ class ArduPilotMavlinkBackend(Backend):
         except:
             carb.log_warn("Could not send groundtruth through mavlink")
 
+    # def send_obstacle_distance_msgs(self, time_usec: int):
+        # self._connection.mav.heartbeat_send(mav_type, mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
+
     def update_graphical_sensor(self, sensor_type: str, data):
         """Method that when implemented, should handle the receival of graphical sensor data
 

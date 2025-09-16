@@ -149,6 +149,7 @@ class MonocularCamera(GraphicalSensor):
             self._state["camera_name"] = self._camera_name
             self._state["stage_prim_path"] = self._stage_prim_path
             #self._state["image"] = self._camera.get_rgba()[:, :, :3]
+            self._state["image"] = self._camera.get_current_frame()['rgb'][:, :, :3] # actually returns rgba, so cut it
             self._state["height"] = self._resolution[1]
             self._state["width"] = self._resolution[0]
             self._state["frequency"] = self._frequency

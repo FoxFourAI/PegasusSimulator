@@ -83,7 +83,7 @@ class ArduPilotLaunchTool:
         Method that will launch an ardupilot instance with the specified configuration
         """
         # sim_vehicle.py -v ArduCopter -f gazebo-iris --mode JSON --console --map
-        command = [ # TODO: Fix it so only one ArduCopter terminal starts
+        command = [
             "/usr/bin/python3", f"{self.ardupilot_dir}/Tools/autotest/sim_vehicle.py",
             "-v", "ArduCopter",
             "-f", f"{self._get_vehicle_frame()}",

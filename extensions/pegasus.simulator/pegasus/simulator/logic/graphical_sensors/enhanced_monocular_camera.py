@@ -154,9 +154,6 @@ class EnhancedMonocularCamera(MonocularCamera):
         current_frame = isaac_camera.get_current_frame()
         data = current_frame['rgb'] # It actually returns RGBA so we have to get rid of the alpha channel
 
-        if self.debug_mode:
-            print(f"[DEBUG] Processing: {data.shape}, range: [{data.min()}, {data.max()}]")
-
         rgb_data = data[:, :, :3]  # Drop alpha channel
 
         return rgb_data

@@ -298,7 +298,7 @@ class ArduPilotMavlinkBackend(Backend):
         self.ardupilot_tool: ArduPilotLaunchTool = None
         self.ardupilot_dir: str = config.ardupilot_dir
 
-        # Set the update rate used for sending the messages (TODO - remove this hardcoded value from here)
+        # Set the update rate used for sending the messages
         self._update_rate: float = config.update_rate
         self._time_step: float = 1.0 / self._update_rate  # s
 

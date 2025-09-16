@@ -268,10 +268,19 @@ class H264RTPStreamer:
             rtp_header = self.create_rtp_header(marker=marker)
             packet = rtp_header + fragment
 
-            self.socket.sendto(packet, (self.host, self.port))
-            self.sequence_number += 1
+            try:
+                self.socket.sendto(packet, (self.host, self.port))
+                self.sequence_number += 1
+            except Exception as e:
+                if e.errno == 9:  # Bad file descriptor after a reset/teardown
+                    # Recreate the socket and skip this packet
+                    print("UDP socket was closed; recreating...")
+                    self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    return
+                else:
+                    raise
 
-            # Small delay between fragments to avoid network congestion
+            # Small delay between fragments
             if not is_last_fragment:
                 time.sleep(0.0001)
 

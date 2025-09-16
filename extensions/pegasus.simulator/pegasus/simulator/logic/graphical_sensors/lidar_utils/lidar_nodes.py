@@ -94,7 +94,7 @@ class Ros2PointCloudPublisher(Node):
         qos = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=10,
-            reliability=QoSReliabilityPolicy.BEST_EFFORT  # typical for point clouds
+            reliability=QoSReliabilityPolicy.BEST_EFFORT
         )
         self.pub = self.create_publisher(PointCloud2, topic, qos)
         self.frame_id = frame_id

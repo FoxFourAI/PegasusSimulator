@@ -21,9 +21,9 @@ class LidarConfig:
     v_fov: float = 16.0              # Vertical FOV in degrees
     h_res: int = 4                   # Horizontal resolution
     v_res: int = 4                   # Vertical resolution
-    min_range: float = 0.5           # Minimum range in meters
-    max_range: float = 100.0         # Maximum range in meters
-    scan_rate: float = 10.0          # Scan rate in Hz
+    min_range: float = 0.05          # Minimum range in meters (also change in mavlink backend)
+    max_range: float = 8.0          # Maximum range in meters
+    scan_rate: float = 40.0          # Scan rate in Hz
 
     # Quality parameters
     range_resolution: float = 0.004

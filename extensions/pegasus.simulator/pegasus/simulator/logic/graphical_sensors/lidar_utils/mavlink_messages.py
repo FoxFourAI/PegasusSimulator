@@ -1,11 +1,13 @@
 from pegasus.simulator.logic.graphical_sensors.lidar_utils.configuration_utils import extract_xyz_from_annotator
 from collections import defaultdict
 import numpy as np
+import line_profiler
 
+# @line_profiler.profile
 def create_obstacle_distances_from_tof_sensors(lidar_configs):
-    """Create obstacle distances array directly from ToF sensor data"""
+    # return [65535] * 72
     # Initialize with max values (no obstacle detected)
-    obstacle_distances = [65535] * 72  # 72 sectors at 5° each = 360°
+    obstacle_distances = [65535] * 72  # 72 sectors at 5 degrees each = 360 degrees
 
     for config in lidar_configs:
         sensor = config["sensor"]
@@ -25,103 +27,102 @@ def create_obstacle_distances_from_tof_sensors(lidar_configs):
             for distance_m in closest_measurements
         ]
 
-        center_sector = config["sector"]
-        half_sectors = 2  # 2 sectors on each side (one LiDAR covers 5 sectors out of 72)
+        closest_distances_cm = closest_distances_cm[::-1]
 
-        # Update the center sector and adjacent sectors
-        column = 0
-        for i in range(0, half_sectors*2):
-            sector_idx = (center_sector + i) % 72
+        sectors = config["sector"]
+        # for idx, sector in enumerate(sectors):
+        #     if idx == 2:
+        #         obstacle_distances[sector % 72] = int((closest_distances_cm[1] + closest_distances_cm[2]) / 2)
+        #         continue
+        #     if idx > 2:
+        #         obstacle_distances[sector % 72] = closest_distances_cm[idx-1]
+        #     else:
+        #         obstacle_distances[sector % 72] = closest_distances_cm[idx]
 
-            if i == 2:
-                # Center sector: use average of adjacent measurements
-                if closest_measurements[1] < 65535 and closest_measurements[3] < 65535:
-                    obstacle_distances[sector_idx] = int((closest_distances_cm[1] + closest_distances_cm[3]) / 2)
-                else:
-                    obstacle_distances[sector_idx] = min(closest_distances_cm[1], closest_distances_cm[3])
-            else:
-                # Side sectors: use individual measurements
-                obstacle_distances[sector_idx] = closest_distances_cm[column]
-                column += 1
+        for idx, sector in enumerate(sectors):
+            obstacle_distances[sector % 72] = closest_distances_cm[idx]
 
     return obstacle_distances
+
+def normalize_deg(a):
+    """Map degrees to (-180, 180]."""
+    a = (a + 180.0) % 360.0 - 180.0
+    # Put +180 into -180 bin for consistent half-open edges later
+    a[a == 180.0] = -180.0
+    return a
+
+def bin_points_by_nearest_azimuth(points_xyz, centers):
+    """
+    Group raw LiDAR hits into columns by nearest azimuth center (degrees).
+    Returns: list of length M (num_cols); each item is array of points.
+    """
+    if points_xyz.size == 0:
+        return [np.empty((0, 3), dtype=np.float32) for _ in range(len(col_centers_deg))]
+
+    # angles of points (sensor frame!)
+    theta = np.rad2deg(np.arctan2(points_xyz[:, 1], points_xyz[:, 0]))  # atan2(y, x)
+    theta = normalize_deg(theta)
+
+    # Broadcast and pick nearest center using circular difference
+    # diff[i, j] = circular distance between theta[i] and centers[j]
+    diff = np.abs(normalize_deg(theta[:, None] - centers[None, :]))  # (N, M)
+    idx = np.argmin(diff, axis=1)  # column index for each point
+
+    M = len(centers)
+    bins = [np.empty((0, 3), dtype=points_xyz.dtype) for _ in range(M)]
+    for j in range(M):
+        sel = (idx == j)
+        if np.any(sel):
+            bins[j] = points_xyz[sel]
+    return bins
+
+def closest_per_column_nearest(points_xyz, col_centers_deg, max_range=np.inf):
+    """
+    Returns:
+      distances: (M,) min Euclidean distance per column (or max_range if none)
+      points:    list length M; the (3,) point that achieved the min (or None)
+    """
+    cols = bin_points_by_nearest_azimuth(points_xyz, col_centers_deg)
+    M = len(cols)
+    d_min = np.full(M, max_range, dtype=np.float64)
+    p_min = [None] * M
+    for j, arr in enumerate(cols):
+        if arr.shape[0]:
+            d = np.linalg.norm(arr, axis=1)
+            k = int(np.argmin(d))
+            d_min[j] = d[k]
+            p_min[j] = arr[k]
+    return d_min, p_min
+
 
 def get_closest_measurements(sensor_prim, points):
     num_cols = sensor_prim.GetAttribute("omni:sensor:Core:numLines").Get()
     num_rows = sensor_prim.GetAttribute("omni:sensor:Core:numRaysPerLine").Get()[0] # Has num_cols values
 
-    closest_measurements = [0 for _ in range(num_cols)]
+    emitter_id = "s001"
 
-    sorted_indices = np.argsort(points[:, 1])
-    sorted_points = points[sorted_indices]
+    # Set azimuth array
+    azimuth_attr = f"omni:sensor:Core:emitterState:{emitter_id}:azimuthDeg"
+    az = sensor_prim.GetAttribute(azimuth_attr).Get()
 
-    for col_idx in range(num_cols):
-        start_idx = col_idx * num_rows
-        end_idx = start_idx + num_rows
+    az = np.asarray(az, dtype=np.float64)
 
-        column_points = sorted_points[start_idx:end_idx]
-        sorted_column_indices = np.argsort(column_points[:, 0]) # Sort by X
-        sorted_column_points = column_points[sorted_column_indices]
-        min_distance = 65535
-        for i, point in enumerate(sorted_column_points):
-            # Euclidian distance from origin
-            distance = np.sqrt(np.sum(point**2))
-            min_distance = min(min_distance, distance)
+    col_centers = az[:num_cols] # Take the first num_cols elements which represent each column
+    col_centers = normalize_deg(col_centers)
 
-        closest_measurements[col_idx] = min_distance
-
-    return closest_measurements
+    closest_dists, closest_points = closest_per_column_nearest(points, col_centers, max_range=65535.0)
 
 
-    # def publish_lidar_data_to_mavlink(self):
-    #     """Publish LiDAR sensor data to MAVLink using obstacle distance"""
-    #     if self.ardupilot_backend is None:
-    #         return
-    #
-    #     # Initialize obstacle distances array (72 sectors at 5° each = 360°)
-    #     obstacle_distances = [65535] * 72
-    #
-    #     # Map the 6 LiDAR sensors to sectors
-    #     sensor_sector_map = {
-    #         'lidar_front': 0,          # 0° forward
-    #         'lidar_left_front': 12,    # 60° (12 * 5° = 60°)
-    #         'lidar_left_back': 24,     # 120° (24 * 5° = 120°)
-    #         'lidar_back': 36,          # 180° (36 * 5° = 180°)
-    #         'lidar_right_back': 48,    # 240° (48 * 5° = 240°)
-    #         'lidar_right_front': 60,   # 300° (60 * 5° = 300°)
-    #     }
-    #
-    #     for sensor_name, annotator in self.lidar_annotators.items():
-    #         if sensor_name not in sensor_sector_map:
-    #             continue
-    #
-    #         try:
-    #             data = annotator.get_data()
-    #             if data is not None and 'data' in data:
-    #                 points = data['data']
-    #
-    #                 if len(points) > 0:
-    #                     # Find closest distance in the point cloud
-    #                     distances = []
-    #                     for point in points:
-    #                         distance = np.sqrt(point[0]**2 + point[1]**2 + point[2]**2)
-    #                         distances.append(distance)
-    #
-    #                     if distances:
-    #                         # Convert to centimeters and clamp to valid range
-    #                         closest_distance_cm = int(min(distances) * 100)
-    #                         closest_distance_cm = max(5, min(65535, closest_distance_cm))
-    #
-    #                         # Update obstacle distance array
-    #                         center_sector = sensor_sector_map[sensor_name]
-    #                         obstacle_distances[center_sector] = closest_distance_cm
-    #
-    #         except Exception as e:
-    #             print(f"Error processing LiDAR data for MAVLink {sensor_name}: {e}")
-    #
-    #     # Send obstacle distances to ArduPilot
-    #     try:
-    #         self.ardupilot_backend._sensor_data.obstacle_distances = obstacle_distances
-    #         self.ardupilot_backend._sensor_data.new_obstacle_data = True
-    #     except Exception as e:
-    #         print(f"Error sending obstacle data to MAVLink: {e}")
+    return closest_dists
+
+def send_lidar_data_to_mavlink(lidar_configs, ardupilot_backend):
+    if ardupilot_backend is None:
+        print("No ArduPilot backend! Cannot send LiDARs data to MAVLink!")
+        return
+
+    # Create obstacle distances array (72 sectors at 5 degrees each = 360 degrees)
+    obstacle_distances = create_obstacle_distances_from_tof_sensors(lidar_configs)
+
+    # Send obstacle distances to ArduPilot
+    ardupilot_backend._sensor_data.obstacle_distances = obstacle_distances
+    ardupilot_backend._sensor_data.new_obstacle_data = True

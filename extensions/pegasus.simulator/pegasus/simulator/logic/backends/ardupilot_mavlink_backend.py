@@ -31,9 +31,9 @@ class SensorSource:
         | DIFF_PRESS (int): mavlink binary code for the pressure sensor (0b0010000000000=1024)
     """
 
-    ACCEL: int = 7    
-    GYRO: int = 56          
-    MAG: int = 448        
+    ACCEL: int = 7
+    GYRO: int = 56
+    MAG: int = 448
     BARO: int = 6656
     DIFF_PRESS: int = 1024
 
@@ -107,24 +107,24 @@ class SensorMsg:
         self.sim_ind_airspeed = 0.0  # Indicated air speed
         self.sim_true_airspeed = 0.0  # Indicated air speed
         self.sim_velocity_inertial = [0.0, 0.0, 0.0]  # North-east-down [m/s]
-        
-        self.sim_position = [0.0, 0.0, 0.0]  # [N, E, D]
-        
 
-class ThrusterControl:  
+        self.sim_position = [0.0, 0.0, 0.0]  # [N, E, D]
+
+
+class ThrusterControl:
     """
-    An auxiliary data class that saves the thrusters command data received via mavlink and 
+    An auxiliary data class that saves the thrusters command data received via mavlink and
     scales them into individual angular velocities expressed in rad/s to apply to each rotor
     """
 
     def __init__(
-        self,
-        num_rotors: int = 4,
-        input_offset=[0, 0, 0, 0],
-        input_scaling=[0, 0, 0, 0],
-        input_min=1000,
-        input_max=2000,
-        zero_position_armed=[100, 100, 100, 100],
+            self,
+            num_rotors: int = 4,
+            input_offset=[0, 0, 0, 0],
+            input_scaling=[0, 0, 0, 0],
+            input_min=1000,
+            input_max=2000,
+            zero_position_armed=[100, 100, 100, 100],
     ):
         """Initialize the ThrusterControl object
 
@@ -178,7 +178,7 @@ class ThrusterControl:
         if len(servos) < self.num_rotors:
             carb.log_warn("Did not receive enough inputs for all the rotors")
             return
-            
+
         # Update the desired reference for every rotor (and saturate according to the min and max values)
         for i in range(self.num_rotors):
             # Bound incoming command between 0 and 1
@@ -189,7 +189,7 @@ class ThrusterControl:
             pwm_max = 2000
             multiplier = self.input_scaling[i]
             offset = self.input_offset[i]
-            
+
             raw_cmd = (pwm - pwm_min) / (pwm_max - pwm_min)
             raw_cmd = np.clip(raw_cmd, 0.0, 1.0)
 
@@ -215,12 +215,12 @@ class ArduPilotMavlinkBackendConfig:
 
         Args:
             config (dict): A Dictionary that contains all the parameters for configuring the Mavlink interface - it can be empty or only have some of the parameters used by this backend.
-        
+
         Examples:
             The dictionary default parameters are
 
-            >>> {"vehicle_id": 0,           
-            >>>  "connection_type": "udpin",           
+            >>> {"vehicle_id": 0,
+            >>>  "connection_type": "udpin",
             >>>  "connection_ip": "localhost",
             >>>  "connection_baseport": 5760,
             >>>  "ardupilot_autolaunch": True,
@@ -270,7 +270,7 @@ def timestamp():
 
 def microseconds_to_seconds(microseconds):
     return microseconds / 1_000_000.0
-        
+
 class ArduPilotMavlinkBackend(Backend):
     """ The Mavlink Backend used to receive the vehicle's state and sensor data in order to send to ArduPilot through mavlink. It also
     receives via mavlink the thruster commands to apply to each vehicle rotor.
@@ -338,10 +338,11 @@ class ArduPilotMavlinkBackend(Backend):
         self._current_utime: int = 0
 
         self.test_time = 0
+        self._last_obs_time = 0
 
     def update_sensor(self, sensor_type: str, data):
-        """Method that is used as callback for the vehicle for every iteration that a sensor produces new data. 
-        Only the IMU, GPS, Barometer and  Magnetometer sensor data are stored to be sent through mavlink. Every other 
+        """Method that is used as callback for the vehicle for every iteration that a sensor produces new data.
+        Only the IMU, GPS, Barometer and  Magnetometer sensor data are stored to be sent through mavlink. Every other
         sensor data that gets passed to this function is discarded.
 
         Args:
@@ -532,7 +533,7 @@ class ArduPilotMavlinkBackend(Backend):
             carb.log_info("Mavlink connection was not closed, because it was never opened")
 
     def start(self):
-        """Method that handles the begining of the simulation of vehicle. It will try to open the mavlink connection 
+        """Method that handles the begining of the simulation of vehicle. It will try to open the mavlink connection
         interface and also attempt to launch ArduPilot in a background process if that option as specified in the config class
         """
 
@@ -589,7 +590,7 @@ class ArduPilotMavlinkBackend(Backend):
 
         # Restart the sensor data
         self._sensor_data = SensorMsg()
-        
+
         self.ap = ArduPilotPlugin(fdm_port_in=9002 + self._vehicle_id * 10)
         self.ap.drain_unread_packets()
 
@@ -636,14 +637,17 @@ class ArduPilotMavlinkBackend(Backend):
 
         carb.log_info("Checking is Armed")
         self.update_is_armed()
-        carb.log_info("Update Motor Commands")  
+        carb.log_info("Update Motor Commands")
         self.update_motor_commands(servos)
-    
+
         carb.log_info("Post Update")
         self.ap.post_update(
             sim_time=self._current_utime,
             sensor_data=self._sensor_data
         )
+
+        # Send OBSTACLE_DISTANCE message
+        self.send_obstacle_distance_msgs(int(self._current_utime * 1_000_000))
 
     def update_is_armed(self):
         # Use this loop to emulate a do-while loop (make sure this runs at least once)
@@ -673,8 +677,8 @@ class ArduPilotMavlinkBackend(Backend):
         """
         Method that is used to publish an heartbear through mavlink protocol
 
-        Args: 
-            mav_type (int): The ID that indicates the type of vehicle. Defaults to MAV_TYPE_GENERIC=0 
+        Args:
+            mav_type (int): The ID that indicates the type of vehicle. Defaults to MAV_TYPE_GENERIC=0
         """
 
         carb.log_info("Sending heartbeat")
@@ -825,7 +829,7 @@ class ArduPilotMavlinkBackend(Backend):
                 self._sensor_data.sim_angular_vel[2],
                 self._sensor_data.sim_lat,
                 self._sensor_data.sim_lon,
-                self._sensor_data.sim_alt,  
+                self._sensor_data.sim_alt,
                 self._sensor_data.sim_velocity_inertial[0],
                 self._sensor_data.sim_velocity_inertial[1],
                 self._sensor_data.sim_velocity_inertial[2],
@@ -838,8 +842,55 @@ class ArduPilotMavlinkBackend(Backend):
         except:
             carb.log_warn("Could not send groundtruth through mavlink")
 
-    # def send_obstacle_distance_msgs(self, time_usec: int):
-        # self._connection.mav.heartbeat_send(mav_type, mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
+    def send_obstacle_distance_msgs(self, time_usec: int):
+        """
+        Method that is used to send simulated LiDAR data through the mavlink protocol.
+
+        Args:
+            time_usec (int): The total time elapsed since the simulation started
+        """
+        # if time_usec - self._last_obs_time < 3000:
+        #     return
+        # self._last_obs_time = time_usec
+
+        carb.log_info("Sending OBSTACLE_DISTANCE msgs")
+
+        # Do not send LiDAR data, if not new data was received
+        if not hasattr(self._sensor_data, "new_obstacle_data") or not self._sensor_data.new_obstacle_data:
+            return
+
+        self._sensor_data.new_obstacle_data = False
+
+        try:
+            response = self._connection.mav.obstacle_distance_send(
+                time_usec,
+                0,                                      # Sensor type (0 = MAV_DISTANCE_SENSOR_LASER)
+                self._sensor_data.obstacle_distances,   # Distances
+                0,                                      # Increment
+                5,                                      # Min distance in cm
+                800,                                   # Max distance in cm
+                5.0,                                    # Increment (float). If it is non-zero then it is used instead of increment
+                0,                                      # Angle offset (0 = zero bin straight ahead)
+                mavutil.mavlink.MAV_FRAME_BODY_FRD      # Frame for body-mounted sensors
+            )
+            non_max_values = 0
+            idexes = []
+            for idx, value in enumerate(self._sensor_data.obstacle_distances):
+                if value != 65535:
+                    non_max_values += 1
+                    idexes.append(idx)
+            # left_front = [self._sensor_data.obstacle_distances[i] for i in range(58, 62)]
+            # right_front = [self._sensor_data.obstacle_distances[i] for i in range(10, 14)]
+            # front = [self._sensor_data.obstacle_distances[i] for i in range(-2, 2)]
+            # print(f"Obstacle distance message with {non_max_values} values on positions {idexes} sent.")
+            # print(f"LiDAR data in cm:\n{left_front} | {front} | {right_front}")
+
+            left_front = [self._sensor_data.obstacle_distances[i] for i in range(-4, 0)]
+            right_front = [self._sensor_data.obstacle_distances[i] for i in range(0, 4)]
+            print(f"Obstacle distance message with {non_max_values} values on positions {idexes} sent.")
+            print(f"LiDAR data in cm:\n{left_front} | {right_front}")
+        except Exception as e:
+            carb.log_warn(f"Could not send LiDAR data through mavlink\n{e}")
 
     def update_graphical_sensor(self, sensor_type: str, data):
         """Method that when implemented, should handle the receival of graphical sensor data

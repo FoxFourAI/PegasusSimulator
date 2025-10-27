@@ -181,7 +181,6 @@ class PegasusInterface:
         """
         self._world = World(**self._world_settings)
         self._world.set_gpu_dynamics_enabled(1)
-        #asyncio.ensure_future(self._world.initialize_simulation_context_async())
 
     def get_vehicle(self, stage_prefix: str):
         """Method that returns the vehicle object given its 'stage_prefix', i.e., the name the vehicle was spawned with in the simulator.

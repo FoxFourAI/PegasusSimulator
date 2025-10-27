@@ -88,12 +88,14 @@ class ArduPilotLaunchTool:
             "-v", "ArduCopter",
             "-f", f"{self._get_vehicle_frame()}",
             "--model", f"{self.model}",
+            "--add-param-file", f"{self.ardupilot_dir}/br_oa.parm",
             f"{'--no-rebuild' if self._sitl_already_exists() else ''}",
             f"--console",
             f"--map",
             "-I", f"{self.vehicle_id}",
             "--sysid", f"{self.vehicle_id + 1}",
-            "--out", f"udp:127.0.0.1:{14550 + self.vehicle_id * 10}",
+            "--out", f"udp:127.0.0.1:{14550 + self.vehicle_id * 10}", # Isaac Sim
+            "--out", f"udp:127.0.0.1:{14551 + self.vehicle_id * 10}", # QGC
         ]
 
         # Filter out empty strings from the command

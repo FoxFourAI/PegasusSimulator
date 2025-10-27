@@ -96,6 +96,8 @@ class ArduPilotLaunchTool:
             "--sysid", f"{self.vehicle_id + 1}",
             "--out", f"udp:127.0.0.1:{14550 + self.vehicle_id * 10}", # Isaac Sim
             "--out", f"udp:127.0.0.1:{14551 + self.vehicle_id * 10}", # QGC
+            "--out", f"udp:127.0.0.1:{14552 + self.vehicle_id * 10}", # Orchestrator
+            # "--in", f"udp:127.0.0.1:{14553 + self.vehicle_id * 10}", # Orchestrator
         ]
 
         # Filter out empty strings from the command

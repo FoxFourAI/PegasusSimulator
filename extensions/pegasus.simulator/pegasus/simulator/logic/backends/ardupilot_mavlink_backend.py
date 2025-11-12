@@ -885,10 +885,10 @@ class ArduPilotMavlinkBackend(Backend):
             # print(f"Obstacle distance message with {non_max_values} values on positions {idexes} sent.")
             # print(f"LiDAR data in cm:\n{left_front} | {front} | {right_front}")
 
-            left_front = [self._sensor_data.obstacle_distances[i] for i in range(-4, 0)]
-            right_front = [self._sensor_data.obstacle_distances[i] for i in range(0, 4)]
-            print(f"Obstacle distance message with {non_max_values} values on positions {idexes} sent.")
-            print(f"LiDAR data in cm:\n{left_front} | {right_front}")
+            #left_front = [self._sensor_data.obstacle_distances[i] for i in range(-4, 0)]
+            #right_front = [self._sensor_data.obstacle_distances[i] for i in range(0, 4)]
+            #print(f"Obstacle distance message with {non_max_values} values on positions {idexes} sent.")
+            #print(f"LiDAR data in cm:\n{left_front} | {right_front}")
         except Exception as e:
             carb.log_warn(f"Could not send LiDAR data through mavlink\n{e}")
 

@@ -79,35 +79,27 @@ class H264RTPStreamer:
 
             # H.264 encoding parameters
             '-c:v', 'libx264',
-            '-preset', 'ultrafast',
+            '-preset', 'medium', # ultrafast fast medium
             '-tune', 'zerolatency',
-            '-profile:v', 'baseline',
+            '-profile:v', 'baseline', # main high baseline
             '-level', '3.1',
 
             # Bitrate control
             '-b:v', f'{self.bitrate}k',
             '-maxrate', f'{self.bitrate}k',
-            '-bufsize', f'{self.bitrate//2}k',
+            '-bufsize', f'{self.bitrate*2}k', # was /2
 
             # GOP structure
             '-g', str(self.fps),  # I-frame every second
             '-keyint_min', str(self.fps//2), # Minimum I-frame interval
             '-sc_threshold', '0', # Disable scene change detection
 
-            # Annex B format with start codes
-            '-bsf:v', 'h264_mp4toannexb',
-
-            # Color space
-            '-pix_fmt', 'yuv420p',
-
-            # No audio
-            '-an',
-
-            # Error logging
-            '-loglevel', 'error', '-report',
-
-            # Output format: raw H.264 with NAL units
-            '-f', 'h264',
+            '-bsf:v', 'h264_mp4toannexb', # Annex B format with start codes
+            '-x264-params', 'repeat-headers=1:annexb=1', # Force repeat headers
+            '-pix_fmt', 'yuv420p', # Color space
+            '-an', # No audio
+            '-loglevel', 'error', '-report', # Error logging
+            '-f', 'h264', # Output format
             '-'  # Output to stdout
         ]
 

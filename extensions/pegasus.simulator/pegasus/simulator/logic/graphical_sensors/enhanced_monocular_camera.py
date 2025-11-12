@@ -42,7 +42,7 @@ class EnhancedMonocularCamera(MonocularCamera):
             >>> "stream_width": 640,
             >>> "stream_height": 480,
             >>> "stream_fps": 30,
-            >>> "stream_bitrate": 1000000,  # 1 Mbps
+            >>> "stream_bitrate": 2000000,  # 2 Mbps
             >>> "debug_mode": True,
             >>> "test_pattern_mode": False,
             >>> "depth": True,
@@ -61,7 +61,7 @@ class EnhancedMonocularCamera(MonocularCamera):
 
         # Frame processing control
         self.frame_counter = 0
-        self.udp_frame_skip = max(1, int(60.0 / config.get("frequency", 30.0))) # How often a frame is sent over UDP for H.264 streaming assuming the simulation is running 60 FPS
+        self.udp_frame_skip = max(1, int(60.0 / config.get("frequency", 30.0))) # How often a frame is sent assuming the simulation is running 60 FPS
 
         # Debug and initialization tracking
         self.debug_mode = config.get("debug_mode", True)

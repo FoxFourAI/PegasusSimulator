@@ -11,6 +11,55 @@ import os
 # Isaac Sim RTX LiDAR imports
 from pxr import Gf, Vt, Usd, UsdGeom, UsdPhysics, Sdf
 
+def add_cube_near_house():
+    FixedCuboid(
+        prim_path="/World/RedCube897",
+        name="red_cube_897",
+        position=np.array([-131.8, 140.4, 0.0]),
+        scale=np.array([1.0, 1.0, 12]),
+        color=np.array([1.0, 0.0, 0.0])
+    )
+
+    FixedCuboid(
+        prim_path="/World/YellowCube896",
+        name="yellow_cube_896",
+        position=np.array([-127.1, 149.3, 0.0]),
+        scale=np.array([1.0, 1.0, 12]),
+        color=np.array([1.0, 0.9, 0.0])
+    )
+
+    FixedCuboid(
+        prim_path="/World/RedCube894",
+        name="red_cube_894",
+        position=np.array([-122.2, 158.6, 0.0]),
+        scale=np.array([1.0, 1.0, 12]),
+        color=np.array([1.0, 0.0, 0.0])
+    )
+
+    FixedCuboid(
+        prim_path="/World/GreenCube893",
+        name="green_cube_893",
+        position=np.array([-118.2, 167.1, 0.0]),
+        scale=np.array([1.0, 1.0, 12]),
+        color=np.array([0.0, 1.0, 0.0])
+    )
+
+    FixedCuboid(
+        prim_path="/World/BlueCubeRoad",
+        name="blue_cube_road",
+        position=np.array([-120.1, 140.4, 0.0]),
+        scale=np.array([1.0, 1.0, 12]),
+        color=np.array([0.0, 0.0, 0.1])
+    )
+
+    FixedCuboid(
+        prim_path="/World/RedCubeRoad",
+        name="red_cube_road",
+        position=np.array([-141.8, 130.4, 0.0]),
+        scale=np.array([1.0, 1.0, 12]),
+        color=np.array([1.0, 0.0, 0.0])
+    )
+
 def point_in_polygon(point, polygon):
     """Check if a point is inside a polygon using ray casting algorithm."""
     x, y = point

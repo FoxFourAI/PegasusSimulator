@@ -82,7 +82,7 @@ WORLD_SETTINGS = {
         "device": "cpu"
     },
     'ardupilot': {
-        "physics_dt": 1.0 / 800.0,
+        "physics_dt": 1.0 / 1200.0,
         "stage_units_in_meters": 1.0,
         "rendering_dt": 1.0 / 60.0,
         "device": "cpu"

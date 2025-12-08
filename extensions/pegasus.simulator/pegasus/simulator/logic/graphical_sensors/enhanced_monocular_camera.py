@@ -61,14 +61,16 @@ class EnhancedMonocularCamera(MonocularCamera):
 
         # Frame processing control
         self.frame_counter = 0
-        self.udp_frame_skip = max(1, int(60.0 / config.get("frequency", 30.0))) # How often a frame is sent assuming the simulation is running 60 FPS
+        sensor_frequency = config.get("frequency", 30.0)
+        desired_stream_fps = config.get("stream_fps", 30)
+        self.udp_frame_skip = max(1, int(60 / desired_stream_fps))
 
         # Debug and initialization tracking
         self.debug_mode = config.get("debug_mode", True)
         self.test_pattern_mode = config.get("test_pattern_mode", False)
         self.camera_ready = False
         self.initialization_frames = 0
-        self.max_init_frames = 25
+        self.max_init_frames = 5
 
         # H.264 streaming parameters
         self.stream_width = config.get("stream_width", 640)
@@ -194,8 +196,6 @@ class EnhancedMonocularCamera(MonocularCamera):
         if self.frame_counter % self.udp_frame_skip != 0:
             self.frame_counter += 1
             return
-
-        frame_source = "unknown"
 
         # During initialization
         if not self.wait_for_camera_ready():

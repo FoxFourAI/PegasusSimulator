@@ -56,7 +56,7 @@ class PegasusApp:
         self.pg.load_environment(SIMULATION_ENVIRONMENTS["Curved Gridroom"])
 
         # Spawn 5 vehicles with the Ardupilot control backend in the simulation, separated by 1.0 m along the x-axis
-        for i in range(5):
+        for i in range(4):
             self.vehicle_factory(i, gap_x_axis=1.0)
 
         # Reset the simulation environment so that all articulations (aka robots) are initialized

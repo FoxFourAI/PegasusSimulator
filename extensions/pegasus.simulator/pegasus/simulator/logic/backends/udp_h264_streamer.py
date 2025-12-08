@@ -188,6 +188,7 @@ class H264RTPStreamer:
 
     def fragment_nal_unit(self, nal_unit: bytes) -> List[bytes]:
         """Fragment large NAL units using FU-A fragmentation"""
+        # Only fragment if NAL unit exceeds MTU
         # if len(nal_unit) <= self.max_payload_size:
         #     # Single NAL unit packet
         #     return [nal_unit]
@@ -328,13 +329,13 @@ class H264RTPStreamer:
 
         # Read available data
         h264_data = b'' # Will accumulate the output H.264 byte stream
-        max_attempts = 50 # To avoid infinite loops
+        max_attempts = 100 # To avoid infinite loops
         attempt = 0
         no_data_count = 0
-        max_no_data_count = 15
+        max_no_data_count = 100
 
         # Give FFmpeg initial time to start encoding
-        time.sleep(0.005)
+        time.sleep(0.01)
 
         while attempt < max_attempts and no_data_count < max_no_data_count:
             try:
@@ -376,13 +377,13 @@ class H264RTPStreamer:
         self.timestamp += self.timestamp_increment
 
         # Check health after processing
-        if len(h264_data) == 0 and no_data_count >= max_no_data_count:
-            print(f"\n{'='*60}")
-            print("FFMPEG STOPPED PRODUCING DATA, RESTARTING...")
-            print(f"{'='*60}т")
-            self.stop_ffmpeg_encoder()
-            time.sleep(0.1)
-            self.start_ffmpeg_encoder()
+        # if len(h264_data) == 0 and no_data_count >= max_no_data_count:
+        #     print(f"\n{'='*60}")
+        #     print("FFMPEG STOPPED PRODUCING DATA, RESTARTING...")
+        #     print(f"{'='*60}")
+        #     self.stop_ffmpeg_encoder()
+        #     time.sleep(0.1)
+        #     self.start_ffmpeg_encoder()
 
     def stop_ffmpeg_encoder(self):
         """Stop FFmpeg encoder process"""

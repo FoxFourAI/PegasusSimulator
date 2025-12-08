@@ -98,8 +98,18 @@ class MonocularCamera(GraphicalSensor):
         # Start the camera
         self._camera.initialize()
 
+        # Set the camera to use pinhole model (no distortion)
+        self._camera.set_lens_distortion_model("pinhole")
+
+        # Calculate the focal length from the intrinsics
+        # Assuming square pixels and using fx
+        focal_length = fx * self._camera.get_horizontal_aperture() / self._resolution[0]
+        self._camera.set_focal_length(focal_length)
+
+        self._camera.set_clipping_range(0.05, 100.0)
+
         # Set the correct properties of the camera (this must be done after the camera object is initialized)
-        #self._camera.set_projection_type("pinhole")
+        # self._camera.set_projection_type("pinhole")
         #self._camera.set_projection_type("fisheyePolynomial")  # # f-theta model, to approximate the fisheye model
         #self._camera.set_rational_polynomial_properties(self._resolution[0], self._resolution[1], cx, cy, self._diagonal_fov, self._distortion_coefficients)
         #self._camera.set_clipping_range(0.05, 100.0)

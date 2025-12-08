@@ -1,6 +1,6 @@
 from omni.isaac.core.objects import DynamicCuboid, FixedCuboid, DynamicSphere
 from omni.isaac.core.materials import PhysicsMaterial
-from pxr import Usd, UsdGeom, Sdf
+from pxr import Usd, UsdGeom, Sdf, UsdLux
 from omni.usd import get_context
 import omni.isaac.core.utils.stage as stage_utils
 import numpy as np
@@ -10,6 +10,59 @@ import os
 
 # Isaac Sim RTX LiDAR imports
 from pxr import Gf, Vt, Usd, UsdGeom, UsdPhysics, Sdf
+# Near the top of add_objects.py, with other imports
+from omni.isaac.core.utils.xforms import reset_xform_ops
+
+# Add this function to the end of add_objects.py
+# Add this function to the end of add_objects.py
+from pxr import Gf, UsdGeom, UsdPhysics
+
+def add_bicycle(usd_path):
+    """
+    Add the bicycle and print debug info about its geometry and bounds.
+    """
+    prim_path = "/World/Bicycle"
+    print(f"[BICYCLE] Adding reference: {usd_path} -> {prim_path}")
+
+    stage_utils.add_reference_to_stage(usd_path=usd_path, prim_path=prim_path)
+
+    stage = get_context().get_stage()
+    prim = stage.GetPrimAtPath(prim_path)
+
+    if not prim.IsValid():
+        print(f"[BICYCLE] ERROR: Failed to create prim at {prim_path}")
+        return
+
+    # Print what kind of prim we got
+    print(f"[BICYCLE] Prim type: {prim.GetTypeName()}")
+    print(f"[BICYCLE] Children under {prim_path}:")
+    for child in prim.GetChildren():
+        print(f"  - {child.GetPath()} ({child.GetTypeName()})")
+
+    xformable = UsdGeom.Xformable(prim)
+    xformable.ClearXformOpOrder()
+
+    # 1. Transform first
+    xformable.AddScaleOp().Set(Gf.Vec3d(1.0, 1.0, 1.0))
+    xformable.AddTranslateOp().Set(Gf.Vec3d(-124.8, 153.9, 5.1))
+
+    # 2. Compute world-space bounding box
+    bbox_cache = UsdGeom.BBoxCache(
+        Usd.TimeCode.Default(),
+        includedPurposes=[UsdGeom.Tokens.default_, UsdGeom.Tokens.render]
+    )
+    bbox = bbox_cache.ComputeWorldBound(prim)
+    bounds = bbox.ComputeAlignedRange()
+    print(f"[BICYCLE] World bounds min: {bounds.GetMin()}, max: {bounds.GetMax()}")
+
+    # 4. Optional: just in case, add physics, but this is not needed for visibility
+    # try:
+    #     UsdPhysics.RigidBodyAPI.Apply(prim)
+    #     UsdPhysics.CollisionAPI.Apply(prim)
+    # except Exception as e:
+    #     print(f"[BICYCLE] Physics warning: {e}")
+
+    print(f"[BICYCLE] Final transform applied. Check /World/Bicycle in the Stage tree and press F to frame it.")
 
 def add_cube_near_house():
     FixedCuboid(
@@ -352,28 +405,6 @@ def replace_prim_with_obj():
 
     return True
 
-# def replace_prim_references(prim_path, new_usd_path):
-#     """
-#     Replace the references of an existing prim with a new USD file.
-#     This keeps the prim but changes what it references.
-#     """
-#     stage = get_context().get_stage()
-#     prim = stage.GetPrimAtPath(prim_path)
-#
-#     if not prim.IsValid():
-#         print(f"Prim not found: {prim_path}")
-#         return False
-#
-#     # Clear all existing references
-#     references = prim.GetReferences()
-#     references.ClearReferences()
-#
-#     # Add new reference
-#     references.AddReference(new_usd_path)
-#
-#     print(f"✓ Replaced references for {prim_path} with {new_usd_path}")
-#     return True
-
 def add_test_objects():
     """Add various physics objects around the drone for LiDAR testing"""
     print("Adding test objects for LiDAR detection...")
@@ -612,3 +643,102 @@ def add_four_walls():
         scale=np.array([10.0, 0.5, 45]),
         color=np.array([0.3, 0.6, 0.3]) # Dark green
     )
+
+def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0.5, slab_thickness=0.5):
+    print("Inside add_walls_around_center")
+    cx, cy, cz = center
+
+    # Place floor at bottom, ceiling at top, walls centered vertically
+    half_h = height / 2.0
+    floor_z = cz - half_h
+    ceil_z = cz + half_h
+    wall_z = cz
+
+    # --- Walls (your existing code) ---
+    front_wall = FixedCuboid(
+        prim_path="/World/Room/FrontObstacle",
+        name="front_obstacle",
+        position=np.array([cx + radius, cy, wall_z]),
+        scale=np.array([wall_thickness, 2 * radius, height]),
+        color=np.array([0.9, 0.1, 0.1]),
+    )
+
+    back_wall = FixedCuboid(
+        prim_path="/World/Room/BackObstacle",
+        name="back_obstacle",
+        position=np.array([cx - radius, cy, wall_z]),
+        scale=np.array([wall_thickness, 2 * radius, height]),
+        color=np.array([0.1, 0.1, 0.9]),
+    )
+
+    right_wall = FixedCuboid(
+        prim_path="/World/Room/RightObstacle",
+        name="right_obstacle",
+        position=np.array([cx, cy + radius, wall_z]),
+        scale=np.array([2 * radius, wall_thickness, height]),
+        color=np.array([0.6, 0.3, 0.6]),
+    )
+
+    left_wall = FixedCuboid(
+        prim_path="/World/Room/LeftObstacle",
+        name="left_obstacle",
+        position=np.array([cx, cy - radius, wall_z]),
+        scale=np.array([2 * radius, wall_thickness, height]),
+        color=np.array([0.3, 0.6, 0.3]),
+    )
+
+    floor = FixedCuboid(
+        prim_path="/World/Room/Floor",
+        name="floor",
+        position=np.array([cx, cy, floor_z]),
+        scale=np.array([2 * radius, 2 * radius, slab_thickness]),
+        color=np.array([0.2, 0.2, 0.2]),
+    )
+
+    ceiling = FixedCuboid(
+        prim_path="/World/Room/Ceiling",
+        name="ceiling",
+        position=np.array([cx, cy, ceil_z]),
+        scale=np.array([2 * radius, 2 * radius, slab_thickness]),
+        color=np.array([0.25, 0.25, 0.3]),
+    )
+
+    # --- Lights inside the room (updated) ---
+    print("Before stage usage")
+    room_root = Sdf.Path("/World/Room")
+
+    # Put lights near the ceiling, centered in X/Y
+    light_z = ceil_z - 1.0          # 1 m below the ceiling
+    light_intensity = 50000.0       # much brighter than 5000
+    light_radius = 1.0
+
+    # Center light
+    light1_path = room_root.AppendChild("Light_01")
+    light1 = UsdLux.SphereLight.Define(stage, light1_path)
+    light1.CreateRadiusAttr(light_radius)
+    light1.CreateIntensityAttr(light_intensity)
+    light1.CreateExposureAttr(0.0)
+    light1.CreateColorAttr((1.0, 1.0, 1.0))
+    light1.AddTranslateOp().Set((cx, cy, light_z))
+
+    # Second light, slightly offset to avoid flat shading
+    light2_path = room_root.AppendChild("Light_02")
+    light2 = UsdLux.SphereLight.Define(stage, light2_path)
+    light2.CreateRadiusAttr(light_radius)
+    light2.CreateIntensityAttr(light_intensity)
+    light2.CreateExposureAttr(0.0)
+    light2.CreateColorAttr((1.0, 0.95, 0.9))  # slightly warm
+    light2.AddTranslateOp().Set((cx + radius * 0.2, cy - radius * 0.2, light_z))
+
+    print(f"[ROOM] Added cube room around center={center}, radius={radius}, "
+          f"height={height}, wall_thickness={wall_thickness}, slab_thickness={slab_thickness}")
+
+    return {
+        "front": front_wall,
+        "back": back_wall,
+        "right": right_wall,
+        "left": left_wall,
+        "floor": floor,
+        "ceiling": ceiling,
+        "lights": (light1, light2),
+    }

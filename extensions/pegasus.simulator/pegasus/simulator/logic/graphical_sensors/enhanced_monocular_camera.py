@@ -8,9 +8,23 @@ __all__ = ["EnhancedMonocularCamera"]
 import cv2
 import numpy as np
 import time
+import threading
+import queue
+
 from pegasus.simulator.logic.graphical_sensors.monocular_camera import MonocularCamera
 from pegasus.simulator.logic.backends.udp_h264_streamer import H264RTPStreamer
 from pegasus.simulator.logic.state import State
+
+# ROS 2 Imports (Safety check)
+try:
+    import rclpy
+    from rclpy.node import Node
+    from sensor_msgs.msg import Image
+    from std_msgs.msg import Header
+    ROS2_AVAILABLE = True
+except ImportError:
+    ROS2_AVAILABLE = False
+    print("[WARNING] ROS 2 not found. Depth publishing will be disabled.")
 
 
 class EnhancedMonocularCamera(MonocularCamera):
@@ -51,8 +65,34 @@ class EnhancedMonocularCamera(MonocularCamera):
             >>> "diagonal_fov": 140.0}
         """
 
+        # Ensure depth is enabled in the configuration
+        if "depth" not in config:
+            config["depth"] = True
+
         # Initialize the Super class "object" attributes
         super().__init__(camera_name, config)
+
+        # -------------------------
+        # ROS 2 Depth Streaming Setup
+        # -------------------------
+        self.ros2_enabled = config.get("ros2_depth_streaming", False) and ROS2_AVAILABLE
+        self.ros2_topic = config.get("ros2_depth_topic", f"/{camera_name}/depth")
+        self.ros2_queue_size = config.get("ros2_queue_size", 2)
+
+        # Threading setup to avoid blocking simulation physics
+        self.depth_queue = queue.Queue(maxsize=self.ros2_queue_size)
+        self.stop_threads = False
+        self.ros_node = None
+        self.depth_pub = None
+
+        if self.ros2_enabled:
+            # Initialize ROS 2 logic
+            self._init_ros2_node(camera_name)
+
+            # Start worker thread
+            self.worker_thread = threading.Thread(target=self._ros_worker, daemon=True)
+            self.worker_thread.start()
+            print(f"ROS 2 Depth Streamer initialized on topic: {self.ros2_topic}")
 
         # UDP configuration
         self.udp_enabled = config.get("udp_streaming", False)
@@ -84,6 +124,23 @@ class EnhancedMonocularCamera(MonocularCamera):
         self.last_successful_frame_time = time.time()
 
         print(f"Enhanced camera initialized: {camera_name}")
+
+    def _init_ros2_node(self, camera_name):
+        """Helper to initialize ROS node and publisher safely"""
+        try:
+            if not rclpy.ok():
+                rclpy.init()
+
+            # Create a unique node for this camera
+            node_name = f"{camera_name}_depth_publisher_node"
+            self.ros_node = rclpy.create_node(node_name)
+
+            # Create Publisher for sensor_msgs/Image
+            self.depth_pub = self.ros_node.create_publisher(Image, self.ros2_topic, 10)
+
+        except Exception as e:
+            print(f"[ERROR] Failed to init ROS 2 node: {e}")
+            self.ros2_enabled = False
 
     def initialize(self, vehicle):
         """Initialize camera with UDP streaming"""
@@ -181,14 +238,97 @@ class EnhancedMonocularCamera(MonocularCamera):
 
     def update(self, state: State, dt: float):
         """Update method"""
-        # Call parent update
+        # Call parent update to ensure sensors are ticked
         camera_data = super().update(state, dt)
 
-        # Process frame for streaming
-        if self.udp_streamer and self._camera_full_set:
-            self.process_frame_for_streaming(camera_data)
+        if self._camera_full_set:
+            # 1. Handle H.264 Video Streaming
+            if self.udp_streamer:
+                self.process_frame_for_streaming(camera_data)
+
+            # 2. Handle ROS 2 Depth Streaming
+            if self.ros2_enabled:
+                self.process_and_queue_depth()
 
         return camera_data
+
+    def process_and_queue_depth(self):
+        """
+        Extracts depth data, clips it, and queues it for ROS publishing.
+        """
+        current_frame = self._camera.get_current_frame()
+
+        # --- FIX: Check for the key that ACTUALLY exists ---
+        if "distance_to_image_plane" not in current_frame:
+            # Fallback logic in case the sensor isn't ready
+            return
+
+        # --- FIX: Use 'distance_to_image_plane' (Z-depth) instead of 'distance_to_camera' ---
+        depth_map = current_frame["distance_to_image_plane"]
+
+        # 2. FIX: Check if the data itself is None (happens during sim startup)
+        if depth_map is None:
+            return
+
+        # Optimize: Only process if the queue has space (drop frame otherwise)
+        if not self.depth_queue.full():
+            # 1. Clean Data: Replace Infinite values (Sky is usually inf)
+            depth_map = np.nan_to_num(depth_map, posinf=6.0, neginf=0.0)
+
+            # 2. Clip Logic: 0.2m to 6.0m
+            processed_depth = np.clip(depth_map, 0.2, 6.0)
+
+            # 3. Queue the data along with the current time
+            timestamp = time.time()
+            self.depth_queue.put((processed_depth, timestamp))
+
+            # (Optional) Debug Print to confirm data is flowing
+            if self.frame_counter % 60 == 0:
+               print(f"Queueing Depth: {processed_depth.shape}")
+
+    def _ros_worker(self):
+        """
+        Background thread that picks depth arrays from queue and publishes ROS messages.
+        """
+        while not self.stop_threads:
+            try:
+                # Wait for data with a timeout
+                item = self.depth_queue.get(timeout=1.0)
+                depth_data, timestamp = item
+            except queue.Empty:
+                continue
+
+            try:
+                # Construct sensor_msgs/Image manually (faster than cv_bridge dependency)
+                msg = Image()
+
+                # Header
+                msg.header = Header()
+                msg.header.stamp = self.ros_node.get_clock().now().to_msg()
+                msg.header.frame_id = f"{self._camera_name}_optical_frame"
+
+                # Dimensions
+                height, width = depth_data.shape
+                msg.height = height
+                msg.width = width
+
+                # Encoding: 32-bit Floating Point, Single Channel (Depth)
+                msg.encoding = "32FC1"
+                msg.is_bigendian = 0
+                msg.step = width * 4  # 4 bytes per float32
+
+                # Data Payload
+                # Ensure it is float32 before converting to bytes
+                msg.data = depth_data.astype(np.float32).tobytes()
+
+                # Publish
+                self.depth_pub.publish(msg)
+
+            except Exception as e:
+                if self.debug_mode:
+                    print(f"[ROS ERROR] Failed to publish depth: {e}")
+            finally:
+                self.depth_queue.task_done()
 
     def process_frame_for_streaming(self, camera_data):
         """Frame processing"""

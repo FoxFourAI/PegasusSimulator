@@ -1,4 +1,4 @@
-from omni.isaac.core.objects import DynamicCuboid, FixedCuboid, DynamicSphere
+from omni.isaac.core.objects import DynamicCuboid, FixedCuboid, DynamicSphere, FixedCylinder
 from omni.isaac.core.materials import PhysicsMaterial
 from pxr import Usd, UsdGeom, Sdf, UsdLux
 from omni.usd import get_context
@@ -12,10 +12,43 @@ import os
 from pxr import Gf, Vt, Usd, UsdGeom, UsdPhysics, Sdf
 # Near the top of add_objects.py, with other imports
 from omni.isaac.core.utils.xforms import reset_xform_ops
+import omni.kit.commands
 
 # Add this function to the end of add_objects.py
 # Add this function to the end of add_objects.py
 from pxr import Gf, UsdGeom, UsdPhysics
+
+def add_objects_for_exploration():
+    # Objects for exploration
+    orange_cylinder = FixedCylinder(
+        prim_path="/World/ExplorationObjects/OrangeCylinder",
+        name="orange_cylinder",
+        position=np.array([-127.0, 119.0, 6.5]),
+        scale=np.array([5.0, 5.0, 20.0]),
+        color=np.array([0.93, 0.49, 0.16]) # Orange
+    )
+    yellow_cylinder = FixedCylinder(
+        prim_path="/World/ExplorationObjects/YellowCylinder",
+        name="yellow_cylinder",
+        position=np.array([-106.0, 168.0, 6.5]),
+        scale=np.array([5.0, 5.0, 20.0]),
+        color=np.array([0.8, 0.93, 0.16]) # Yellow
+    )
+    green_cube = FixedCuboid(
+        prim_path="/World/ExplorationObjects/GreenCube",
+        name="green_cube",
+        position=np.array([-157.4, 139.2, 6.5]),
+        scale=np.array([5.0, 5.0, 20]),
+        color=np.array([0.16, 0.93, 0.16]) # Green
+    )
+    omni.kit.commands.execute(
+        "CreatePrim",
+        prim_type="DistantLight",
+        prim_path="/World/DistantLight"
+    )
+    stage = omni.usd.get_context().get_stage()
+    distant_light = UsdLux.DistantLight(stage.GetPrimAtPath("/World/DistantLight"))
+    distant_light.GetIntensityAttr().Set(1200)
 
 def add_bicycle(usd_path):
     """
@@ -644,8 +677,7 @@ def add_four_walls():
         color=np.array([0.3, 0.6, 0.3]) # Dark green
     )
 
-def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0.5, slab_thickness=0.5):
-    print("Inside add_walls_around_center")
+def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0.5, slab_thickness=0.5, ceiling=False):
     cx, cy, cz = center
 
     # Place floor at bottom, ceiling at top, walls centered vertically
@@ -695,40 +727,40 @@ def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0
         color=np.array([0.2, 0.2, 0.2]),
     )
 
-    ceiling = FixedCuboid(
-        prim_path="/World/Room/Ceiling",
-        name="ceiling",
-        position=np.array([cx, cy, ceil_z]),
-        scale=np.array([2 * radius, 2 * radius, slab_thickness]),
-        color=np.array([0.25, 0.25, 0.3]),
-    )
+    if ceiling:
+        ceiling = FixedCuboid(
+            prim_path="/World/Room/Ceiling",
+            name="ceiling",
+            position=np.array([cx, cy, ceil_z]),
+            scale=np.array([2 * radius, 2 * radius, slab_thickness]),
+            color=np.array([0.25, 0.25, 0.3]),
+        )
 
-    # --- Lights inside the room (updated) ---
-    print("Before stage usage")
-    room_root = Sdf.Path("/World/Room")
+        # --- Lights inside the room (updated) ---
+        room_root = Sdf.Path("/World/Room")
 
-    # Put lights near the ceiling, centered in X/Y
-    light_z = ceil_z - 1.0          # 1 m below the ceiling
-    light_intensity = 50000.0       # much brighter than 5000
-    light_radius = 1.0
+        # Put lights near the ceiling, centered in X/Y
+        light_z = ceil_z - 1.0          # 1 m below the ceiling
+        light_intensity = 50000.0       # much brighter than 5000
+        light_radius = 1.0
 
-    # Center light
-    light1_path = room_root.AppendChild("Light_01")
-    light1 = UsdLux.SphereLight.Define(stage, light1_path)
-    light1.CreateRadiusAttr(light_radius)
-    light1.CreateIntensityAttr(light_intensity)
-    light1.CreateExposureAttr(0.0)
-    light1.CreateColorAttr((1.0, 1.0, 1.0))
-    light1.AddTranslateOp().Set((cx, cy, light_z))
+        # Center light
+        light1_path = room_root.AppendChild("Light_01")
+        light1 = UsdLux.SphereLight.Define(stage, light1_path)
+        light1.CreateRadiusAttr(light_radius)
+        light1.CreateIntensityAttr(light_intensity)
+        light1.CreateExposureAttr(0.0)
+        light1.CreateColorAttr((1.0, 1.0, 1.0))
+        light1.AddTranslateOp().Set((cx, cy, light_z))
 
-    # Second light, slightly offset to avoid flat shading
-    light2_path = room_root.AppendChild("Light_02")
-    light2 = UsdLux.SphereLight.Define(stage, light2_path)
-    light2.CreateRadiusAttr(light_radius)
-    light2.CreateIntensityAttr(light_intensity)
-    light2.CreateExposureAttr(0.0)
-    light2.CreateColorAttr((1.0, 0.95, 0.9))  # slightly warm
-    light2.AddTranslateOp().Set((cx + radius * 0.2, cy - radius * 0.2, light_z))
+        # Second light, slightly offset to avoid flat shading
+        light2_path = room_root.AppendChild("Light_02")
+        light2 = UsdLux.SphereLight.Define(stage, light2_path)
+        light2.CreateRadiusAttr(light_radius)
+        light2.CreateIntensityAttr(light_intensity)
+        light2.CreateExposureAttr(0.0)
+        light2.CreateColorAttr((1.0, 0.95, 0.9))  # slightly warm
+        light2.AddTranslateOp().Set((cx + radius * 0.2, cy - radius * 0.2, light_z))
 
     print(f"[ROOM] Added cube room around center={center}, radius={radius}, "
           f"height={height}, wall_thickness={wall_thickness}, slab_thickness={slab_thickness}")
@@ -740,5 +772,5 @@ def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0
         "left": left_wall,
         "floor": floor,
         "ceiling": ceiling,
-        "lights": (light1, light2),
+        # "lights": (light1, light2),
     }

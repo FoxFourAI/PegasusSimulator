@@ -305,7 +305,7 @@ class EnhancedMonocularCamera(MonocularCamera):
                 # Header
                 msg.header = Header()
                 msg.header.stamp = self.ros_node.get_clock().now().to_msg()
-                msg.header.frame_id = f"{self._camera_name}_optical_frame"
+                msg.header.frame_id = f"top_view_camera"
 
                 # Dimensions
                 height, width = depth_data.shape
@@ -313,13 +313,14 @@ class EnhancedMonocularCamera(MonocularCamera):
                 msg.width = width
 
                 # Encoding: 32-bit Floating Point, Single Channel (Depth)
-                msg.encoding = "32FC1"
+                msg.encoding = "16UC1"
                 msg.is_bigendian = 0
-                msg.step = width * 4  # 4 bytes per float32
+                msg.step = width * 2  # 2 bytes per uint16
 
                 # Data Payload
-                # Ensure it is float32 before converting to bytes
-                msg.data = depth_data.astype(np.float32).tobytes()
+                # Convert float meters to uint16 millimeters (matching real camera convention)
+                depth_mm = (depth_data * 1000).astype(np.uint16)
+                msg.data = depth_mm.tobytes()
 
                 # Publish
                 self.depth_pub.publish(msg)

@@ -1,4 +1,4 @@
-from omni.isaac.core.objects import DynamicCuboid, FixedCuboid, DynamicSphere, FixedCylinder
+from omni.isaac.core.objects import DynamicCuboid, FixedCuboid, DynamicSphere, FixedCylinder, FixedCone
 from omni.isaac.core.materials import PhysicsMaterial
 from pxr import Usd, UsdGeom, Sdf, UsdLux
 from omni.usd import get_context
@@ -7,6 +7,8 @@ import numpy as np
 from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation
 import os
+import carb
+import math
 
 # Isaac Sim RTX LiDAR imports
 from pxr import Gf, Vt, Usd, UsdGeom, UsdPhysics, Sdf
@@ -18,7 +20,215 @@ import omni.kit.commands
 # Add this function to the end of add_objects.py
 from pxr import Gf, UsdGeom, UsdPhysics
 
-def add_objects_for_exploration():
+def prepare_exploration_environment():
+    # Cubes for obstacle avoidance
+    # cube1 = FixedCuboid(
+    #     prim_path="/World/Cube1",
+    #     name="cube1",
+    #     position=np.array([0.8, 3.2, 0.0]),
+    #     scale=np.array([2.7, 2.5, 7.0]),
+    #     color=np.array([0.9, 0.0, 0.1])
+    # )
+    # cube2 = FixedCuboid(
+    #     prim_path="/World/Cube2",
+    #     name="cube2",
+    #     position=np.array([5.2, -3.0, 0.0]),
+    #     scale=np.array([2.7, 2.5, 7.0]),
+    #     color=np.array([0.3, 0.6, 0.2])
+    # )
+    # cube3 = FixedCuboid(
+    #     prim_path="/World/Cube3",
+    #     name="cube3",
+    #     position=np.array([-4.9, -3.0, 0.0]),
+    #     scale=np.array([2.7, 2.5, 7.0]),
+    #     color=np.array([0.8, 0.1, 0.6])
+    # )
+
+    # World
+    floor = FixedCuboid(
+        prim_path="/World/Floor",
+        name="floor",
+        position=np.array([0, 0, -0.1]),
+        scale=np.array([55.0, 55.0, 0.2]),
+        color=np.array([0.1, 0.1, 0.1]) # Gray
+    )
+    grass1 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/Grass1",
+        name="grass1",
+        position=np.array([0.0, -15.0, 0.0]),
+        scale=np.array([55.0, 25.0, 0.2]),
+        color=np.array([0.07, 0.5, 0.07]) # Green
+    )
+    grass2 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/Grass2",
+        name="grass2",
+        position=np.array([0.0, 15.0, 0.0]),
+        scale=np.array([55.0, 25.0, 0.2]),
+        color=np.array([0.07, 0.5, 0.07]) # Green
+    )
+
+    # Orange house
+    orange_cylinder = FixedCylinder(
+        prim_path="/World/ExplorationObjects/OrangeHouse/OrangeCylinder",
+        name="orange_cylinder",
+        position=np.array([-17, -13, 0.0]),
+        scale=np.array([3.0, 3.0, 11.5]),
+        color=np.array([0.98, 0.49, 0.16]) # Orange
+    )
+    orange_cude = FixedCuboid(
+        prim_path="/World/ExplorationObjects/OrangeHouse/OrangeCube",
+        name="orange_cylinder",
+        position=np.array([-17, -16, 0.0]),
+        scale=np.array([12.0, 7.0, 16.0]),
+        color=np.array([0.98, 0.49, 0.16]) # Orange
+    )
+
+    # Blue house
+    blue_part1 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/BlueHouse/BluePart1",
+        name="blue_part1",
+        position=np.array([-17.0, 17.0, 0.0]),
+        scale=np.array([10.0, 6.0, 16.5]),
+        color=np.array([0.0, 0.05, 0.1]) # Blue
+    )
+    blue_part2 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/BlueHouse/BluePart2",
+        name="blue_part2",
+        position=np.array([-16.6, 13.8, 0.0]),
+        scale=np.array([5.0, 2.5, 8.6]),
+        color=np.array([0.0, 0.05, 0.1]) # Blue
+    )
+    blue_part3 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/BlueHouse/BluePart3",
+        name="blue_part3",
+        position=np.array([-16.8, 11.9, 0.0]),
+        scale=np.array([5.0, 1.5, 2.9]),
+        color=np.array([0.0, 0.05, 0.1]) # Blue
+    )
+
+    # Red house
+    red_part1 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/RedHouse/RedPart1",
+        name="red_part1",
+        position=np.array([14.0, -14.0, 0.0]),
+        scale=np.array([5.0, 9.0, 17.5]),
+        color=np.array([0.6, 0.0, 0.0]) # Red
+    )
+    red_part2 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/RedHouse/RedPart2",
+        name="red_part2",
+        position=np.array([14.0, -9.0, 0.0]),
+        scale=np.array([2.5, 2.0, 10.0]),
+        color=np.array([0.6, 0.0, 0.0]) # Red
+    )
+    red_part3 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/RedHouse/RedPart3",
+        name="red_part3",
+        position=np.array([16.9, -15.905, 0.0]),
+        scale=np.array([5.2, 5.2, 17.5]),
+        color=np.array([0.6, 0.0, 0.0]) # Red
+    )
+
+    # Pink house
+    pink_part1 = FixedCylinder(
+        prim_path="/World/ExplorationObjects/PinkHouse/PinkPart1",
+        name="pink_part1",
+        position=np.array([1.0, 16.0, 0.0]),
+        scale=np.array([5.0, 5.0, 17.0]),
+        color=np.array([1.0, 0.08, 0.57]) # Pink
+    )
+    pink_part2 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/PinkHouse/PinkPart2",
+        name="pink_part2",
+        position=np.array([1.4, 11.2, 0.0]),
+        scale=np.array([5.0, 2.5, 8.5]),
+        color=np.array([1.0, 0.08, 0.57]) # Pink
+    )
+
+    # Purple house
+    purple_part1 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/PurpleHouse/PurplePart1",
+        name="purple_part1",
+        position=np.array([4, -16, 0]),
+        scale=np.array([8.0, 7.0, 18]),
+        color=np.array([0.35, 0.0, 0.2]) # Purple
+    )
+    purple_part2 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/PurpleHouse/PurplePart2",
+        name="purple_part2",
+        position=np.array([3.5, -12, 0]),
+        scale=np.array([3.8, 2.2, 9.8]),
+        color=np.array([0.35, 0.0, 0.2]) # Purple
+    )
+
+    # Trees
+    leaves1 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/Tree1/Leaves",
+        name="leaves1",
+        position=np.array([-1.0, -7.5, 5.6]),
+        scale=np.array([2.0, 2.0, 3.5]),
+        color=np.array([0.05, 0.35, 0.05]) # Green
+    )
+    leaves2 = FixedCuboid(
+        prim_path="/World/ExplorationObjects/Tree2/Leaves",
+        name="leaves1",
+        position=np.array([-4.0, 6, 6.6]),
+        scale=np.array([2.0, 2.0, 3.5]),
+        color=np.array([0.05, 0.35, 0.05]) # Green
+    )
+    trunk1 = FixedCone(
+        prim_path="/World/ExplorationObjects/Tree1/Trunk",
+        name="trunk1",
+        position=np.array([-1.0, -7.5, 1]),
+        scale=np.array([1.0, 1.0, 10.0]),
+        color=np.array([0.54, 0.27, 0.07]) # Brown
+    )
+    trunk2 = FixedCone(
+        prim_path="/World/ExplorationObjects/Tree2/Trunk",
+        name="trunk2",
+        position=np.array([-4.0, 6.0, 1]),
+        scale=np.array([1.0, 1.0, 10.0]),
+        color=np.array([0.54, 0.27, 0.07]) # Brown
+    )
+
+    # Bicycle
+    bicycle_usd_path = "/home/nataliy/Downloads/BicycleAsset/BicycleRoot.usd"
+    if os.path.exists(bicycle_usd_path):
+        add_object(bicycle_usd_path, "bicycle", -19.4, -9.1, 0.1, 1.1, 1.1, 1.1)
+    else:
+        carb.log_error(f"Bicycle USD file not found at: {bicycle_usd_path}")
+
+    # Car
+    car_usd_path = "/home/nataliy/Downloads/ToyotaAsset/Hilux.usdc"
+    if os.path.exists(car_usd_path):
+        add_object(car_usd_path, "car", 11.5, 15, 1.53, 1.25, 1.25, 1.25)
+    else:
+        carb.log_error(f"Car USD file not found at: {car_usd_path}")
+
+    # Numbers
+    number_usd_path = "/home/nataliy/Downloads/Number/Number.usd"
+    if os.path.exists(number_usd_path):
+        add_object(number_usd_path, "Numbers/Number32", -13.5, -12.9, 3.0, 1.0, 1.0, 1.0)
+        add_object(number_usd_path, "Numbers/Number8", -13.5, 14.3, 3.0, 100.0, 100.0, 100.0)
+
+        angle = math.radians(-90)
+        orientation = (0.0, 0.0, math.sin(angle / 2), math.cos(angle / 2))
+        add_object(number_usd_path, "Numbers/Number2", 2.95, 10.35, 3.0, 100.0, 100.0, 100.0, orientation)
+        add_object(number_usd_path, "Numbers/Number4", 12.0, -9.7, 3.0, 100.0, 100.0, 100.0, orientation)
+    else:
+        carb.log_error(f"Number USD file not found at: {number_usd_path}")
+
+    # Light
+    omni.kit.commands.execute(
+        "CreatePrim",
+        prim_type="DomeLight",
+        prim_path="/World/DomeLight"
+    )
+    stage = omni.usd.get_context().get_stage()
+    dome_light = UsdLux.DistantLight(stage.GetPrimAtPath("/World/DomeLight"))
+    dome_light.GetIntensityAttr().Set(1000)
+
+def add_objects_for_exploration(): # Rivermark
     # Objects for exploration
     orange_cylinder = FixedCylinder(
         prim_path="/World/ExplorationObjects/OrangeCylinder",
@@ -50,12 +260,13 @@ def add_objects_for_exploration():
     distant_light = UsdLux.DistantLight(stage.GetPrimAtPath("/World/DistantLight"))
     distant_light.GetIntensityAttr().Set(1200)
 
-def add_bicycle(usd_path):
+
+def add_object(usd_path, name, x, y, z, scale_x = 1.0, scale_y = 1.0, scale_z = 1.0, orientation=None):
     """
     Add the bicycle and print debug info about its geometry and bounds.
     """
-    prim_path = "/World/Bicycle"
-    print(f"[BICYCLE] Adding reference: {usd_path} -> {prim_path}")
+    prim_path = f"/World/{name}"
+    print(f"[ADD OBJECT] Adding reference: {usd_path} -> {prim_path}")
 
     stage_utils.add_reference_to_stage(usd_path=usd_path, prim_path=prim_path)
 
@@ -63,12 +274,12 @@ def add_bicycle(usd_path):
     prim = stage.GetPrimAtPath(prim_path)
 
     if not prim.IsValid():
-        print(f"[BICYCLE] ERROR: Failed to create prim at {prim_path}")
+        print(f"[ADD OBJECT] ERROR: Failed to create prim at {prim_path}")
         return
 
     # Print what kind of prim we got
-    print(f"[BICYCLE] Prim type: {prim.GetTypeName()}")
-    print(f"[BICYCLE] Children under {prim_path}:")
+    print(f"[ADD OBJECT] Prim type: {prim.GetTypeName()}")
+    print(f"[ADD OBJECT] Children under {prim_path}:")
     for child in prim.GetChildren():
         print(f"  - {child.GetPath()} ({child.GetTypeName()})")
 
@@ -76,8 +287,14 @@ def add_bicycle(usd_path):
     xformable.ClearXformOpOrder()
 
     # 1. Transform first
-    xformable.AddScaleOp().Set(Gf.Vec3d(1.0, 1.0, 1.0))
-    xformable.AddTranslateOp().Set(Gf.Vec3d(-124.8, 153.9, 5.1))
+    # xformable.AddScaleOp().Set(Gf.Vec3d(scale_x, scale_y, scale_z))
+    # xformable.AddTranslateOp().Set(Gf.Vec3d(x, y, z))
+    # Translate first, then scale
+    xformable.AddTranslateOp().Set(Gf.Vec3d(x, y, z))
+    if orientation is not None:
+        # orientation should be (x, y, z, w) quaternion
+        xformable.AddOrientOp().Set(Gf.Quatf(orientation[3], orientation[0], orientation[1], orientation[2]))
+    xformable.AddScaleOp().Set(Gf.Vec3d(scale_x, scale_y, scale_z))
 
     # 2. Compute world-space bounding box
     bbox_cache = UsdGeom.BBoxCache(
@@ -86,7 +303,7 @@ def add_bicycle(usd_path):
     )
     bbox = bbox_cache.ComputeWorldBound(prim)
     bounds = bbox.ComputeAlignedRange()
-    print(f"[BICYCLE] World bounds min: {bounds.GetMin()}, max: {bounds.GetMax()}")
+    print(f"[ADD OBJECT] World bounds min: {bounds.GetMin()}, max: {bounds.GetMax()}")
 
     # 4. Optional: just in case, add physics, but this is not needed for visibility
     # try:
@@ -145,6 +362,7 @@ def add_cube_near_house():
         scale=np.array([1.0, 1.0, 12]),
         color=np.array([1.0, 0.0, 0.0])
     )
+    return
 
 def point_in_polygon(point, polygon):
     """Check if a point is inside a polygon using ray casting algorithm."""
@@ -686,46 +904,51 @@ def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0
     ceil_z = cz + half_h
     wall_z = cz
 
+    constant_z_offset = - 0.5
+
     # --- Walls (your existing code) ---
     front_wall = FixedCuboid(
         prim_path="/World/Room/FrontObstacle",
         name="front_obstacle",
-        position=np.array([cx + radius, cy, wall_z]),
-        scale=np.array([wall_thickness, 2 * radius, height]),
-        color=np.array([0.9, 0.1, 0.1]),
+        position=np.array([cx + radius, cy, wall_z + half_h - height/4 + constant_z_offset]),
+        scale=np.array([wall_thickness, 2 * radius, height/2]),
+        # color=np.array([0.9, 0.1, 0.1])
+        color=np.array([0.1, 0.1, 0.9])
     )
 
     back_wall = FixedCuboid(
         prim_path="/World/Room/BackObstacle",
         name="back_obstacle",
-        position=np.array([cx - radius, cy, wall_z]),
-        scale=np.array([wall_thickness, 2 * radius, height]),
-        color=np.array([0.1, 0.1, 0.9]),
+        position=np.array([cx - radius, cy, wall_z + half_h - height/4 + constant_z_offset]),
+        scale=np.array([wall_thickness, 2 * radius, height/2]),
+        color=np.array([0.1, 0.1, 0.9])
     )
 
     right_wall = FixedCuboid(
         prim_path="/World/Room/RightObstacle",
         name="right_obstacle",
-        position=np.array([cx, cy + radius, wall_z]),
-        scale=np.array([2 * radius, wall_thickness, height]),
-        color=np.array([0.6, 0.3, 0.6]),
+        position=np.array([cx, cy + radius, wall_z + half_h - height/4 + constant_z_offset]),
+        scale=np.array([2 * radius, wall_thickness, height/2]),
+        # color=np.array([0.6, 0.3, 0.6])
+        color=np.array([0.1, 0.1, 0.9])
     )
 
     left_wall = FixedCuboid(
         prim_path="/World/Room/LeftObstacle",
         name="left_obstacle",
-        position=np.array([cx, cy - radius, wall_z]),
-        scale=np.array([2 * radius, wall_thickness, height]),
-        color=np.array([0.3, 0.6, 0.3]),
+        position=np.array([cx, cy - radius, wall_z + half_h - height/4 + constant_z_offset]),
+        scale=np.array([2 * radius, wall_thickness, height/2]),
+        # color=np.array([0.3, 0.6, 0.3])
+        color=np.array([0.1, 0.1, 0.9])
     )
 
-    floor = FixedCuboid(
-        prim_path="/World/Room/Floor",
-        name="floor",
-        position=np.array([cx, cy, floor_z]),
-        scale=np.array([2 * radius, 2 * radius, slab_thickness]),
-        color=np.array([0.2, 0.2, 0.2]),
-    )
+    # floor = FixedCuboid(
+    #     prim_path="/World/Room/Floor",
+    #     name="floor",
+    #     position=np.array([cx, cy, floor_z]),
+    #     scale=np.array([2 * radius, 2 * radius, slab_thickness]),
+    #     # color=np.array([0.2, 0.2, 0.2])
+    # )
 
     if ceiling:
         ceiling = FixedCuboid(
@@ -765,12 +988,12 @@ def add_walls_around_center(stage, center, radius, height=80.0, wall_thickness=0
     print(f"[ROOM] Added cube room around center={center}, radius={radius}, "
           f"height={height}, wall_thickness={wall_thickness}, slab_thickness={slab_thickness}")
 
-    return {
-        "front": front_wall,
-        "back": back_wall,
-        "right": right_wall,
-        "left": left_wall,
-        "floor": floor,
-        "ceiling": ceiling,
-        # "lights": (light1, light2),
-    }
+    # return {
+    #     "front": front_wall,
+    #     "back": back_wall,
+    #     "right": right_wall,
+    #     "left": left_wall,
+    #     # "floor": floor,
+    #     "ceiling": ceiling,
+    #     # "lights": (light1, light2),
+    # }

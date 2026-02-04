@@ -64,8 +64,3 @@ def force_enable_collisions(stage):
                 count += 1
 
     print(f"SUCCESS: Enabled physics on {count} wall/structure meshes.")
-
-    # STEP 3: Bake Physics
-    print("3. Warming up physics engine...")
-    for _ in range(60):
-        self.world.step(render=False)
